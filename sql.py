@@ -85,17 +85,18 @@ def build_where_clause(tables):
          rnd = random.choice(range(1, 100))
 
          # Type is a single value
-         if rnd < 33:
+         if rnd < 1:
             c = random.choice(s.hypernym.hyponyms())
 
             where_clause = where_clause + where_and + \
                format(s.hypernym[0]) + '_type ' + random.choice(['=', '<>']) + ' \'' + c[0] + '\'\n'
 
          # Type is an in list
-         elif rnd < 66 and len(s.hypernym.hyponyms()) > 1:
+#         elif rnd < 66 and len(s.hypernym.hyponyms()) > 1:
+         elif rnd < 100:
             where_clause = where_clause + where_and + format(s.hypernym[0]) + '_type IN'
 
-            max = random.randrange(len(s.hypernym.hyponyms()))
+            max = random.randrange(1, len(s.hypernym.hyponyms()))
             if max > 5:
                max = 5
 
