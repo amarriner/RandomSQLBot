@@ -7,13 +7,11 @@ from nltk.corpus import brown
 from pattern.en import pluralize, singularize, wordnet
 from string import Template
 
-import json
 import keys
 import nltk
 import os
 import pattern.en
 import random
-import requests
 import sys
 
 # Maximum number of tables to generate
@@ -41,11 +39,13 @@ def build_select_clause(tables, where_clause):
 
    select_clause = ''
 
+   # 25% chance of just SELECT *
    if random.choice(range(1, 100)) < 25:
       select_clause = '*'
    else:
       rnd = random.choice(range(1, 100))
 
+      # 50% chance of a COUNT(*) of types when there is no where clause
       if rnd < 50 and not where_clause:
          select_clause = format(tables[0].hypernym[0]) + '_type, COUNT(*)'
       else:
@@ -72,6 +72,7 @@ def build_where_clause(tables):
 
       where_clause = where_clause + first + '_id = ' + format(singularize(t)) + '_' + first + '_id\n'
 
+   # Keeping track of the where clause
    where_and = ' WHERE '
    if len(where_clause):
       where_and = '   AND '
@@ -124,6 +125,7 @@ def build_where_clause(tables):
 
    return where_clause
 
+
 def get_tables(words):
    """Build a list of tables for the SQL statement from random words"""
 
@@ -137,6 +139,8 @@ def get_tables(words):
                'noun.object'
               ]
 
+   # Loop until we find a table name that is less than the MAX_TABLE_NAME_LENGTH and has a
+   # noun category that is in the list of lexnames above
    tables = []
    for i in range(0, MAX_TABLES):
       lexname = ''
@@ -173,12 +177,14 @@ def format(c):
 def load_words():
    """Build a list of words to choose randomly from"""
 
+   # If there's a cached version of the frequency distribution, load it from disk
    if os.path.isfile('nouns.fd'):
 
       f = open('nouns.fd', 'rb')
       fdist = load(f)
       f.close()
 
+   # Otherwise generate a new one and cache it 
    else:
 
       fdist = nltk.FreqDist([w for w in brown.tagged_words() if w[1] == 'NN'])
@@ -195,6 +201,7 @@ def replace_sql(sql, select_clause, from_clause, where_clause):
 
    sql = sql.substitute(columns=select_clause, tables=from_clause, where=where_clause)
 
+   # Build a GROUP BY clause if the SELECT has a COUNT 
    group_by = ''
    print str(select_clause.find('COUNT')) + ' :: ' + select_clause
    if select_clause.find('COUNT') >= 0:
@@ -202,6 +209,7 @@ def replace_sql(sql, select_clause, from_clause, where_clause):
 
    sql = sql + group_by
 
+   # Build an ORDER BY clause 50% of the time
    order_by = ''
    if random.choice(range(1, 100)) < 50:
       if select_clause.split(' ')[0] == '*':
@@ -212,6 +220,7 @@ def replace_sql(sql, select_clause, from_clause, where_clause):
       if len(order_by):
          order_by = order_by + random.choice(['', ' ASC', ' DESC'])
 
+   # But only attach the ORDER BY if it keeps us under 140 characters
    if len(sql + order_by) < 140:
       sql = sql + order_by
 
@@ -221,6 +230,7 @@ def replace_sql(sql, select_clause, from_clause, where_clause):
 def main():
    """Main Entry Point"""
 
+   # Loop until we get an SQL statement that is less than 140 characters
    sql = '' 
    while len(sql) > 140 or not len(sql):
       sql = Template('SELECT $columns         \n'  + \
@@ -236,7 +246,7 @@ def main():
       sql = replace_sql(sql, select_clause, from_clause, where_clause)
 
    print sql
-   print len(sql)
+
 
 if __name__ == '__main__':
    sys.exit(main())
