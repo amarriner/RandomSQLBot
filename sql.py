@@ -13,6 +13,7 @@ import os
 import pattern.en
 import random
 import sys
+import twitter
 
 # Maximum number of tables to generate
 MAX_TABLES = 1
@@ -85,15 +86,14 @@ def build_where_clause(tables):
          rnd = random.choice(range(1, 100))
 
          # Type is a single value
-         if rnd < 1:
+         if rnd < 33:
             c = random.choice(s.hypernym.hyponyms())
 
             where_clause = where_clause + where_and + \
                format(s.hypernym[0]) + '_type ' + random.choice(['=', '<>']) + ' \'' + c[0] + '\'\n'
 
          # Type is an in list
-#         elif rnd < 66 and len(s.hypernym.hyponyms()) > 1:
-         elif rnd < 100:
+         elif rnd < 66 and len(s.hypernym.hyponyms()) > 1:
             where_clause = where_clause + where_and + format(s.hypernym[0]) + '_type IN'
 
             max = random.randrange(1, len(s.hypernym.hyponyms()))
@@ -123,6 +123,13 @@ def build_where_clause(tables):
 
       if len(where_clause):
          where_and = '   AND '
+
+      hypo = random.choice(s.hypernym.hyponyms())
+      if len(hypo.hyponyms()):
+         sub = random.choice(hypo.hyponyms())[0]
+         where_clause = where_clause + where_and + \
+            format(s.hypernym[0]) + '_subtype ' +  \
+            random.choice(['=', '<>']) + ' \'' + sub + '\'\n'
 
    return where_clause
 
@@ -163,8 +170,10 @@ def get_tables(words):
 
       tables.append(s)
 
+   print '------------------------------------------------------------------------'
    print word
    print tables[0].hyponyms()
+   print '------------------------------------------------------------------------'
 
    return tables
 
@@ -247,6 +256,13 @@ def main():
       sql = replace_sql(sql, select_clause, from_clause, where_clause)
 
    print sql
+   print '------------------------------------------------------------------------'
+
+   # Connect to Twitter
+   api = twitter.Api(keys.consumer_key, keys.consumer_secret, keys.access_token, keys.access_token_secret)
+
+   # Post tweet text and image
+   status = api.PostUpdate(sql)
 
 
 if __name__ == '__main__':
