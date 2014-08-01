@@ -15,6 +15,9 @@ import random
 import sys
 import twitter
 
+# Working Directory
+PWD = '/home/amarriner/python/sql/'
+
 # Maximum number of tables to generate
 MAX_TABLES = 1
 
@@ -188,9 +191,9 @@ def load_words():
    """Build a list of words to choose randomly from"""
 
    # If there's a cached version of the frequency distribution, load it from disk
-   if os.path.isfile('nouns.fd'):
+   if os.path.isfile(PWD + 'nouns.fd'):
 
-      f = open('nouns.fd', 'rb')
+      f = open(PWD + 'nouns.fd', 'rb')
       fdist = load(f)
       f.close()
 
@@ -199,7 +202,7 @@ def load_words():
 
       fdist = nltk.FreqDist([w for w in brown.tagged_words() if w[1] == 'NN'])
 
-      f = open('nouns.fd', 'wb')
+      f = open(PWD + 'nouns.fd', 'wb')
       dump (fdist, f, -1)
       f.close()
 
