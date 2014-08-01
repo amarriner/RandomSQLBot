@@ -1,1 +1,3 @@
-# Silly twitter bot that tweets random SQL statements
+# RandomSQLBot
+
+*Silly twitter bot that tweets random SQL statements*
