@@ -16,6 +16,12 @@ import random
 import requests
 import sys
 
+# Maximum number of tables to generate
+MAX_TABLES = 1
+
+# Maximum length of table name
+MAX_TABLE_NAME_LENGTH = 7
+
 
 def build_from_clause(tables):
    """Assembles a FROM clause from a list of tables"""
@@ -28,6 +34,24 @@ def build_from_clause(tables):
       from_clause = from_clause + format(pluralize(s.hypernym[0]))
 
    return from_clause
+
+
+def build_select_clause(tables, where_clause):
+   """Assemble a SELECT clause from a list of tables"""
+
+   select_clause = ''
+
+   if random.choice(range(1, 100)) < 25:
+      select_clause = '*'
+   else:
+      rnd = random.choice(range(1, 100))
+
+      if rnd < 50 and not where_clause:
+         select_clause = format(tables[0].hypernym[0]) + '_type, COUNT(*)'
+      else:
+         select_clause = format(tables[0].hypernym[0]) + '_name'
+
+   return select_clause
 
 
 def build_where_clause(tables):
@@ -64,8 +88,7 @@ def build_where_clause(tables):
             c = random.choice(s.hypernym.hyponyms())
 
             where_clause = where_clause + where_and + \
-               format(s.hypernym[0]) + '_type = \'' + \
-               c[0] + '\'\n'
+               format(s.hypernym[0]) + '_type ' + random.choice(['=', '<>']) + ' \'' + c[0] + '\'\n'
 
          # Type is an in list
          elif rnd < 66 and len(s.hypernym.hyponyms()) > 1:
@@ -101,61 +124,21 @@ def build_where_clause(tables):
 
    return where_clause
 
-
-def format(c):
-   """Returns a formatted column or table name: lower case, replace spaces with underscores"""
-
-   return c.split(' ')[-1].lower().replace(' ', '_')
-
-def load_words():
-   """Build a list of words to choose randomly from"""
-
-   #fdist = nltk.FreqDist([w for w in brown.tagged_words(categories=['humor', 'fiction', 'adventure', 'hobbies']) if w[1] == 'NN'])
-   if os.path.isfile('nouns.fd'):
-
-      f = open('nouns.fd', 'rb')
-      fdist = load(f)
-      f.close()
-
-   else:
-
-      fdist = nltk.FreqDist([w for w in brown.tagged_words() if w[1] == 'NN' and len(w[0]) < 6])
-
-      f = open('nouns.fd', 'wb')
-      dump (fdist, f, -1)
-      f.close()
-
-   return fdist.most_common()[100:4000]
-
-
-def replace_sql(sql, from_clause, where_clause):
-   """Perform replacement on skeleton SQL"""
-
-   return sql.substitute(columns='*', tables=from_clause, where=where_clause)
-
-
-def main():
-   """Main Entry Point"""
-
-   sql = Template('SELECT $columns         \n'  + \
-                  '  FROM $tables          \n'  + \
-                  '$where')
-
-   columns = ['type',
-              'length',
-             ]
+def get_tables(words):
+   """Build a list of tables for the SQL statement from random words"""
 
    # http://wordnet.princeton.edu/man/lexnames.5WN.html
    lexnames = ['noun.plant', 
                'noun.animal', 
                'noun.food', 
-               'noun.shape'
+               'noun.shape',
+               'noun.body',
+               'noun.artifact',
+               'noun.object'
               ]
 
    tables = []
-   words = load_words()
-
-   for i in range(0, 1):
+   for i in range(0, MAX_TABLES):
       lexname = ''
 
       while lexname not in lexnames:
@@ -167,15 +150,93 @@ def main():
          if len(s):
             s = s[0]
             lexname = s.lexname
+
+            if len(s.hypernym) > MAX_TABLE_NAME_LENGTH:
+               lexname = ''
          else:
             lexname = ''
 
       tables.append(s)
 
-   sql = replace_sql(sql, build_from_clause(tables), build_where_clause(tables))
+   print word
+   print tables[0].hyponyms()
+
+   return tables
+
+
+def format(c):
+   """Returns a formatted column or table name: lower case, replace spaces with underscores"""
+
+   return c.split(' ')[-1].lower().replace(' ', '_')
+
+
+def load_words():
+   """Build a list of words to choose randomly from"""
+
+   if os.path.isfile('nouns.fd'):
+
+      f = open('nouns.fd', 'rb')
+      fdist = load(f)
+      f.close()
+
+   else:
+
+      fdist = nltk.FreqDist([w for w in brown.tagged_words() if w[1] == 'NN'])
+
+      f = open('nouns.fd', 'wb')
+      dump (fdist, f, -1)
+      f.close()
+
+   return fdist.most_common()[100:4000]
+
+
+def replace_sql(sql, select_clause, from_clause, where_clause):
+   """Perform replacement on skeleton SQL"""
+
+   sql = sql.substitute(columns=select_clause, tables=from_clause, where=where_clause)
+
+   group_by = ''
+   print str(select_clause.find('COUNT')) + ' :: ' + select_clause
+   if select_clause.find('COUNT') >= 0:
+      group_by = ' GROUP BY ' + singularize(from_clause.strip().split(' ')[0]) + '_type\n'
+
+   sql = sql + group_by
+
+   order_by = ''
+   if random.choice(range(1, 100)) < 50:
+      if select_clause.split(' ')[0] == '*':
+         order_by = ' ORDER BY ' + random.choice(from_clause.strip().split(' ')[0:]) + '_name'
+      elif select_clause.split(' ')[0] != 'COUNT(*)':
+         order_by = ' ORDER BY ' + select_clause.split(' ')[0].replace(',', '')
+
+      if len(order_by):
+         order_by = order_by + random.choice(['', ' ASC', ' DESC'])
+
+   if len(sql + order_by) < 140:
+      sql = sql + order_by
+
+   return sql.strip() + ';'
+
+
+def main():
+   """Main Entry Point"""
+
+   sql = '' 
+   while len(sql) > 140 or not len(sql):
+      sql = Template('SELECT $columns         \n'  + \
+                     '  FROM $tables          \n'  + \
+                     '$where')
+
+      tables = get_tables(load_words())
+
+      from_clause = build_from_clause(tables)
+      where_clause = build_where_clause(tables)
+      select_clause = build_select_clause(tables, where_clause)
+
+      sql = replace_sql(sql, select_clause, from_clause, where_clause)
+
    print sql
    print len(sql)
-
 
 if __name__ == '__main__':
    sys.exit(main())
